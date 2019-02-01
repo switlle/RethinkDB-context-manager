@@ -1,5 +1,6 @@
 from flask import Flask, abort, jsonify, make_response
 from flask_httpauth import HTTPBasicAuth
+from rethinkdbcm import UseDatabase
 from hashlib import md5
 from config import Config
 
