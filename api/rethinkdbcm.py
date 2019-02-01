@@ -1,18 +1,50 @@
 import rethinkdb as db
+from rethinkdb.errors import ReqlOpFailedError
 
 class UseDatabase:
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict, db=None) -> None:
         self.config = config
-
+        self.config['db'] = db
+#========= Connect to DB ============================
     def __enter__(self):
         """Подключение к базе данных RethinkDB"""
         self.conn = db.connect(**self.config).repl()
         return self
 
+#========= Get, Create, Delete DB ===================
+    def all_db(self):
+        """Получение всех баз данных"""
+        return db.db_list().run()
+        
+    def create_db(self, name):
+        """Создание новой базы данных"""
+        try: 
+            return db.db_create(name).run()
+        except ReqlOpFailedError:
+            d = { name: 'the database is already there' }
+            return d
+        
+    def del_db(self, name):
+        """Удаление базы данных"""
+        try:
+            return db.db_drop(name).run()
+        except ReqlOpFailedError:
+            d = { name: 'database not found' }
+            return d
+
+#========== Get, Create, Delete Table ==================
+    def all_table(self):
+        """Получение всех таблиц из подключенной БД"""
+        t = db.table_list().run()
+        if not t: #Если таблиц нет, выводим сообщение { 'table': 'not found' }
+            t = { 'table': 'not found' }
+        return t
+
+
+
     def gettasks(self, table):
         """Получение всех записей из таблицы базы данных"""
-        tasks = list(db.table(table).run())
-        return tasks
+        return list(db.table(table).run())
 
     def gettask(self, table, req):
         """Получение записей из таблицы базы данных по определенному ID"""
