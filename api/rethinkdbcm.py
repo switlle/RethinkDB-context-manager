@@ -48,7 +48,6 @@ class UseDatabase:
             t = { 'DB ' + name_db: 'does not exist' }
             return t
             
-
     def create_tab(self, name_db, name_t):
         """Создание новой таблицы в базе данных"""
         try: 
@@ -66,24 +65,27 @@ class UseDatabase:
             return t
 
 #=========================================================
-    def gettasks(self, table):
-        """Получение всех записей из таблицы базы данных"""
-        return list(db.table(table).run(self.conn))
+    def insert(self, name_t, json):
+        """Функция добавления новой записи в таблицe БД"""
+        return db.table(name_t).insert(json).run()
 
-    def gettask(self, table, req):
+    def countid(self, name_t, id_name, req):
+        """Функция определения записи в таблице БД по определнному ID
+        0 - записи нет, 1 - запись имеется"""
+        return db.table(name_t).filter({id_name: req}).count().run()
+        
+    def gettasks(self, name_t):
+        """Получение всех записей из таблицы базы данных"""
+        return list(db.table(name_t).run())
+
+    def gettask(self, name_t, req):
         """Получение записей из таблицы базы данных по определенному ID"""
-        task = db.table(table).get(req).run()
-        return task
+        return db.table(name_t).get(req).run()
 
     def getval(self, id, table):
         """Получение значений, без ключей из таблицы базы данных по определенному ID"""
         val = list(db.table(table).get(id).values().run())
         return val
-
-    def insert(self, table, json):
-        """Функция добавления новой записи в таблицe БД"""
-        ins = db.table(table).insert(json).run()
-        return ins
 
     def updat(self, table, id, json):
         """Функция обновления записи в таблице БД по определнному ID"""
@@ -94,12 +96,6 @@ class UseDatabase:
         """Функция удаления записи в таблице БД по определнному ID"""
         dell = db.table(table).get(req).delete().run()
         return dell
-
-    def countid(self, table, req):
-        """Функция определения записи в таблице БД по определнному ID
-        0 - записи нет, 1 - запись имеется"""
-        count = db.table(table).filter({'id': req}).count().run()
-        return count
 
     def countall(self, table):
         """Функция определения количества записи в таблице БД"""

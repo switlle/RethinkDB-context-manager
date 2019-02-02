@@ -2,6 +2,7 @@ from flask import Flask, abort, jsonify, make_response, request
 from flask_httpauth import HTTPBasicAuth
 from rethinkdbcm import UseDatabase
 from hashlib import md5
+from datetime import datetime
 import json
 from config import Config
 
@@ -18,18 +19,28 @@ def setpasswd(login:str, passw:str) -> str:
 @auth.verify_password
 def verify_password(username, password):
     """Проверка пароля и логина"""
-    users = app.config['DATA']
     root = app.config['ROOT_USER']
-    #Если login найден в БД, проверяем совпадает ли passwd
-    if username.lower() in root.keys() and app.config['ROOT']:
-        if root[str(username.lower())] == setpasswd(username.lower(), password):
-        #При совпедении passwd, возвращаем хеш passwd root
-            return root[str(username.lower())]
-    elif username.lower() in users.keys():
-        if users[str(username.lower())]['passw'] == setpasswd(username.lower(), password):
-        #При совпедении passwd, возвращаем хеш passwd из БД
-            return users[str(username.lower())]
+    conf = app.config['DB_CONFIG']
+    use_db = app.config['DB_NAME']
+    tab = app.config['DB_TAB']['tab_1']
+    with UseDatabase(conf, use_db) as db:
+        if username.lower() in root.keys():
+            if root[str(username.lower())] == setpasswd(username.lower(), password):
+            #При совпедении passwd, возвращаем хеш passwd root
+                app.config['GET_USER'] = str(username.lower())
+                return root[str(username.lower())]
+        else:
+            try:
+                l = db.gettask(tab, str(username.lower()))['login']
+            except TypeError:
+                l = None
+            if l == username.lower():
+                if db.gettask(tab, str(username.lower()))['passw'] == setpasswd(username.lower(), password):
+                    app.config['GET_USER'] = str(username.lower())
+                    return db.gettask(tab, str(username.lower()))['passw']
+    
     return None
+    
 
 
 @app.errorhandler(400)
@@ -44,32 +55,12 @@ def not_found(error):
     return make_response(jsonify({'error': 'NotFound'}), 404)
 
 
-@app.route('/api', methods=['GET','POST'])
-@auth.login_required
-def everyone():
-    """Запрос данных о всех пользователях"""
-    # curl -s -u john:hello -X POST http://uwsgi.loc:5000/api
-    # curl -s -u john:hello -G http://uwsgi.loc:5000/api
-    return jsonify(app.config['DATA'])
-
-
-@app.route('/api/<todo>', methods=['GET','POST'])
-@auth.login_required
-def oneof(todo):
-    """Запрос данных по конкретному пользователю"""
-    if todo in app.config['DATA'].keys():
-    # curl -s -u john:hello -X POST http://uwsgi.loc:5000/api/susan
-    # curl -s -u john:hello -G http://uwsgi.loc:5000/api
-        return jsonify({str(todo): app.config['DATA'][str(todo)]})
-    else:
-        abort(404)
-
-
 @app.route('/api/db', methods=['GET','POST','DELETE'])
 @auth.login_required
 def setdb():
+    """Служебный метод"""
     """Запрос баз данных, создание и удаление"""
-    if app.config['ROOT']:
+    if app.config['GET_USER'] == 'root':
         conf = app.config['DB_CONFIG']
         use_db = str(app.config['DB_NAME'])
         with UseDatabase(conf) as db:
@@ -86,11 +77,13 @@ def setdb():
         d = { 'set database': 'not allowed' }
     return jsonify({'info': d})
     
+    
 @app.route('/api/tab', methods=['GET','POST','DELETE'])
 @auth.login_required
 def settab():
+    """Служебный метод"""
     """Запрос таблиц, создание и удаление"""
-    if app.config['ROOT']:
+    if app.config['GET_USER'] == 'root':
         conf = app.config['DB_CONFIG']
         use_db = app.config['DB_NAME']
         name = list(app.config['DB_TAB'].values())
@@ -123,17 +116,79 @@ def settab():
     return jsonify({'info': t})
     
     
+@app.route('/api/all', methods=['GET'])
+@auth.login_required
+def all_users():
+    """Служебный метод"""
+    """Запрос содержания всех таблиц DB"""
+    if app.config['GET_USER'] == 'root':
+        conf = app.config['DB_CONFIG']
+        use_db = app.config['DB_NAME']
+        tab = app.config['DB_TAB']['tab_1']
+        with UseDatabase(conf, use_db) as db:
+            n = db.gettasks(tab)
+        return jsonify({'info': n})
+
+
 @app.route('/api/new', methods=['GET','POST'])
 def new_user():
+    """Метод доступный для всех"""
+    """Создание нового пользователя"""
 #curl -s -H "Content-Type: application/json" -X POST -d '{"name": {"user": "mail@mail.ru"}}' http://uwsgi.loc:5000/api/new
-    if request.method == 'POST':
-        js = json.loads(json.dumps(request.json))
-        json_key = str({'Name': str(*list(js.keys()))})
-        #json_keys = '\{\'Name\': {}\}'.format(*json_key)
-        json_value = str(*list(js.values()))
-        return jsonify(json_key, json_value)
-    elif request.method == 'GET':
+    content = app.config['DB_CONT']
+    conf = app.config['DB_CONFIG']
+    use_db = app.config['DB_NAME']
+    tab = app.config['DB_TAB']['tab_1']
+    id_name = 'id'
+    new_json = {}
+    if request.method == 'GET':
         return jsonify(app.config['HELP'])
+    elif request.method == 'POST':
+        if not request.json:
+            err = { 'request': 'not json format' }
+            return jsonify({'error': err})
+        elif not 'passw' in request.json or not request.json['passw']:
+            err = { 'request': 'password field is empty' }
+            return jsonify({'error': err})
+        elif not 'login' in request.json or not request.json['login']:
+            err = { 'request': 'login field is empty' }
+            return jsonify({'error': err})
+        elif not 'phone' in request.json or not request.json['phone']:
+            err = { 'request': 'phone number field is empty' }
+            return jsonify({'error': err})
+        elif not 'email' in request.json or not request.json['email']:
+            err = { 'request': 'email field is empty' }
+            return jsonify({'error': err})
+        else:
+            new_json['id'] = str(request.json['login'].lower())
+            new_json['login'] = new_json['id']
+            new_json['passw'] = setpasswd(new_json['login'], request.json['passw'])
+            new_json['phone'] = request.json['phone']
+            new_json['email'] = request.json['email']
+            new_json['reg_date'] = datetime.now().strftime("%Y-%m-%d %X")
+            new_json['ch_date'] = new_json['reg_date']
+            new_json['name'] = request.json['name'] if 'name' in request.json else content['name']
+            new_json['gender'] = request.json['gender'] if 'gender' in request.json else content['gender']
+            with UseDatabase(conf, use_db) as db:
+                if db.countid(tab, id_name, new_json['id']) == 0:
+                #Если записи нет, добавляем новую
+                    n = db.insert(tab, new_json)
+                else:
+                    n = { 'user ' + new_json['login']: 'already exist' }
+                return jsonify({'info': n})
+
+
+@app.route('/api/<task_id>', methods=['GET', 'POST', 'DELETE'])
+@auth.login_required
+def get_user(task_id):
+    """Запрос содержания таблици по определенному ID (login), обновление и ее удаление из DB"""
+    conf = app.config['DB_CONFIG']
+    use_db = app.config['DB_NAME']
+    tab = app.config['DB_TAB']['tab_1']
+    if request.method == 'GET':
+        with UseDatabase(conf, use_db) as db:
+            n = db.gettask(tab, str(task_id))
+        return jsonify({'info': n})
 
 
 if __name__ == '__main__':
