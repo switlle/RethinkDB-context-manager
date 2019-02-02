@@ -2,6 +2,7 @@ from flask import Flask, abort, jsonify, make_response, request
 from flask_httpauth import HTTPBasicAuth
 from rethinkdbcm import UseDatabase
 from hashlib import md5
+import json
 from config import Config
 
 app = Flask(__name__)
@@ -120,6 +121,19 @@ def settab():
     else:
         t = { 'set table': 'not allowed' }
     return jsonify({'info': t})
+    
+    
+@app.route('/api/new', methods=['GET','POST'])
+def new_user():
+#curl -s -H "Content-Type: application/json" -X POST -d '{"name": {"user": "mail@mail.ru"}}' http://uwsgi.loc:5000/api/new
+    if request.method == 'POST':
+        js = json.loads(json.dumps(request.json))
+        json_key = str({'Name': str(*list(js.keys()))})
+        #json_keys = '\{\'Name\': {}\}'.format(*json_key)
+        json_value = str(*list(js.values()))
+        return jsonify(json_key, json_value)
+    elif request.method == 'GET':
+        return jsonify(app.config['HELP'])
 
 
 if __name__ == '__main__':
