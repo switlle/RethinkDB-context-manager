@@ -14,7 +14,11 @@ class UseDatabase:
 #========= Get, Create, Delete DB ===================
     def all_db(self):
         """Получение всех баз данных"""
-        return db.db_list().run()
+        try:
+            return db.db_list().run()
+        except ReqlOpFailedError:
+            d = { self.config['db']: 'does not exist' }
+            return d
         
     def create_db(self, name):
         """Создание новой базы данных"""
@@ -33,33 +37,38 @@ class UseDatabase:
             return d
 
 #========== Get, Create, Delete Table ==================
-    def all_table(self):
+    def all_table(self, name_db):
         """Получение всех таблиц из подключенной БД"""
-        t = db.table_list().run()
-        if not t: #Если таблиц нет, выводим сообщение { 'table': 'not found' }
-            t = { 'table': 'not found' }
-        return t
-
-    def create_tab(self, name):
-        """Создание новой таблицы в базе данных"""
-        try: 
-            return db.table_create(name).run()
+        try:
+            t = db.table_list().run(self.conn)
+            if not t: #Если таблиц нет, выводим сообщение { 'table': 'not found' }
+                t = { 'table in DB ' + name_db: 'not found' }
+            return t
         except ReqlOpFailedError:
-            t = { name: 'the table already exists' }
+            t = { 'DB ' + name_db: 'does not exist' }
             return t
             
-    def del_tab(self, name):
+
+    def create_tab(self, name_db, name_t):
+        """Создание новой таблицы в базе данных"""
+        try: 
+            return db.db(name_db).table_create(name_t).run()
+        except ReqlOpFailedError:
+            t = { name_t + ' in DB ' + name_db: 'the table already exists' }
+            return t
+            
+    def del_tab(self, name_db, name_t):
         """Удаление таблицы из базы данных"""
         try:
-            return db.table_drop(name).run()
+            return db.db(name_db).table_drop(name_t).run()
         except ReqlOpFailedError:
-            t = { name: 'the table does not exist' }
+            t = { name_t + ' in DB ' + name_db: 'the table does not exist' }
             return t
 
 #=========================================================
     def gettasks(self, table):
         """Получение всех записей из таблицы базы данных"""
-        return list(db.table(table).run())
+        return list(db.table(table).run(self.conn))
 
     def gettask(self, table, req):
         """Получение записей из таблицы базы данных по определенному ID"""

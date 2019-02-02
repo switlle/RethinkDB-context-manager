@@ -72,13 +72,13 @@ def setdb():
         conf = app.config['DB_CONFIG']
         use_db = str(app.config['DB_NAME'])
         with UseDatabase(conf) as db:
-            # curl -s -G http://uwsgi.loc:5000/api/db
+            # curl -s -u root:root -G http://uwsgi.loc:5000/api/db
             if request.method == 'GET':
                 d = db.all_db()
-            # curl -s -X POST http://uwsgi.loc:5000/api/db
+            # curl -s -u root:root -X POST http://uwsgi.loc:5000/api/db
             elif request.method == 'POST': 
                 d = db.create_db(use_db)
-            # curl -s -X DELETE http://uwsgi.loc:5000/api/db
+            # curl -s -u root:root -X DELETE http://uwsgi.loc:5000/api/db
             elif request.method == 'DELETE':
                 d = db.del_db(use_db)
     else:
@@ -91,34 +91,31 @@ def settab():
     """Запрос таблиц, создание и удаление"""
     if app.config['ROOT']:
         conf = app.config['DB_CONFIG']
-        conf['db'] = app.config['DB_NAME']
+        use_db = app.config['DB_NAME']
         name = list(app.config['DB_TAB'].values())
-        with UseDatabase(conf) as db:
+        t = ''
+        with UseDatabase(conf, use_db) as db:
             # curl -s -G -u root:root http://uwsgi.loc:5000/api/tab
             if request.method == 'GET':
                 """Запрос таблиц"""
-                t = db.all_table()
+                t = db.all_table(use_db)
             # curl -s -u root:root -X POST http://uwsgi.loc:5000/api/tab
             elif request.method == 'POST':
                 """Создание таблицы"""
-                t = ''
                 for n in range(len(name)):
+                    message = db.create_tab(use_db, name[n])
                     if n != len(name)-1:
-                        message = db.create_tab(name[n])
                         t = t + '{},'.format(message)
                     else:
-                        message = db.create_tab(name[n])
                         t = t + '{}'.format(message)
             # curl -s -u root:root -X DELETE http://uwsgi.loc:5000/api/tab
             elif request.method == 'DELETE':
                 """Удалени таблицы"""
-                t = ''
                 for n in range(len(name)):
+                    message = db.del_tab(use_db, name[n])
                     if n != len(name)-1:
-                        message = db.del_tab(name[n])
                         t = t + '{},'.format(message)
                     else:
-                        message = db.del_tab(name[n])
                         t = t + '{}'.format(message)
     else:
         t = { 'set table': 'not allowed' }
