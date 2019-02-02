@@ -4,5 +4,7 @@ class Config(object):
     DB_CONFIG = { 'host': 'localhost', 'port': 28015, }
     DB_NAME = 'data'
     DB_TAB = {'tab_1': 'data', 'tab_2': 'log'}
+    DB_CONT = {'new': {'name': None, 'passw': None, 'gender': None, 'reg_date': None, 'ch_date': None, 'phone': None, 'email': None}}
+    
     DATA = { 'john': {'name': None, 'passw': '018ff8ac396bc810a93e2f84dfbb1714', 'gender': None, 'reg_date': None, 'ch_date': None, 'phone': None, 'email': None}, \
             'susan': {'name': None, 'passw': '35699bdb666b55656fabd4a201c6291f', 'gender': None, 'reg_date': None, 'ch_date': None, 'phone': None, 'email': None} }

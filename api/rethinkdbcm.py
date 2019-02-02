@@ -40,8 +40,23 @@ class UseDatabase:
             t = { 'table': 'not found' }
         return t
 
+    def create_tab(self, name):
+        """Создание новой таблицы в базе данных"""
+        try: 
+            return db.table_create(name).run()
+        except ReqlOpFailedError:
+            t = { name: 'the table already exists' }
+            return t
+            
+    def del_tab(self, name):
+        """Удаление таблицы из базы данных"""
+        try:
+            return db.table_drop(name).run()
+        except ReqlOpFailedError:
+            t = { name: 'the table does not exist' }
+            return t
 
-
+#=========================================================
     def gettasks(self, table):
         """Получение всех записей из таблицы базы данных"""
         return list(db.table(table).run())

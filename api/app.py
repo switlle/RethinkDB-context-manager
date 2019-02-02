@@ -47,8 +47,8 @@ def not_found(error):
 @auth.login_required
 def everyone():
     """Запрос данных о всех пользователях"""
-    # curl -s -u john:hello -X POST http://192.168.0.12:5000/api
-    # curl -s -u john:hello -G http://192.168.0.12:5000/api
+    # curl -s -u john:hello -X POST http://uwsgi.loc:5000/api
+    # curl -s -u john:hello -G http://uwsgi.loc:5000/api
     return jsonify(app.config['DATA'])
 
 
@@ -57,8 +57,8 @@ def everyone():
 def oneof(todo):
     """Запрос данных по конкретному пользователю"""
     if todo in app.config['DATA'].keys():
-    # curl -s -u john:hello -X POST http://192.168.0.12:5000/api/susan
-    # curl -s -u john:hello -G http://192.168.0.12:5000/api
+    # curl -s -u john:hello -X POST http://uwsgi.loc:5000/api/susan
+    # curl -s -u john:hello -G http://uwsgi.loc:5000/api
         return jsonify({str(todo): app.config['DATA'][str(todo)]})
     else:
         abort(404)
@@ -67,17 +67,18 @@ def oneof(todo):
 @app.route('/api/db', methods=['GET','POST','DELETE'])
 @auth.login_required
 def setdb():
+    """Запрос баз данных, создание и удаление"""
     if app.config['ROOT']:
         conf = app.config['DB_CONFIG']
         use_db = str(app.config['DB_NAME'])
         with UseDatabase(conf) as db:
-            # curl -s -G http://192.168.0.12:5000/api/db
+            # curl -s -G http://uwsgi.loc:5000/api/db
             if request.method == 'GET':
                 d = db.all_db()
-            # curl -s -X POST http://192.168.0.12:5000/api/db
+            # curl -s -X POST http://uwsgi.loc:5000/api/db
             elif request.method == 'POST': 
                 d = db.create_db(use_db)
-            # curl -s -X DELETE http://192.168.0.12:5000/api/db
+            # curl -s -X DELETE http://uwsgi.loc:5000/api/db
             elif request.method == 'DELETE':
                 d = db.del_db(use_db)
     else:
@@ -87,22 +88,41 @@ def setdb():
 @app.route('/api/tab', methods=['GET','POST','DELETE'])
 @auth.login_required
 def settab():
+    """Запрос таблиц, создание и удаление"""
     if app.config['ROOT']:
         conf = app.config['DB_CONFIG']
         conf['db'] = app.config['DB_NAME']
+        name = list(app.config['DB_TAB'].values())
         with UseDatabase(conf) as db:
-            # curl -s -G http://192.168.0.12:5000/api/db
+            # curl -s -G -u root:root http://uwsgi.loc:5000/api/tab
             if request.method == 'GET':
-                d = db.all_table()
-            # curl -s -X POST http://192.168.0.12:5000/api/db
-            elif request.method == 'POST': 
-                d = db.create_db(use_db)
-            # curl -s -X DELETE http://192.168.0.12:5000/api/db
+                """Запрос таблиц"""
+                t = db.all_table()
+            # curl -s -u root:root -X POST http://uwsgi.loc:5000/api/tab
+            elif request.method == 'POST':
+                """Создание таблицы"""
+                t = ''
+                for n in range(len(name)):
+                    if n != len(name)-1:
+                        message = db.create_tab(name[n])
+                        t = t + '{},'.format(message)
+                    else:
+                        message = db.create_tab(name[n])
+                        t = t + '{}'.format(message)
+            # curl -s -u root:root -X DELETE http://uwsgi.loc:5000/api/tab
             elif request.method == 'DELETE':
-                d = db.del_db(use_db)
+                """Удалени таблицы"""
+                t = ''
+                for n in range(len(name)):
+                    if n != len(name)-1:
+                        message = db.del_tab(name[n])
+                        t = t + '{},'.format(message)
+                    else:
+                        message = db.del_tab(name[n])
+                        t = t + '{}'.format(message)
     else:
-        d = { 'set database': 'not allowed' }
-    return jsonify({'info': d})
+        t = { 'set table': 'not allowed' }
+    return jsonify({'info': t})
 
 
 if __name__ == '__main__':
