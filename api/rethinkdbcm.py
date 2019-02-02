@@ -67,7 +67,11 @@ class UseDatabase:
 #=========================================================
     def insert(self, name_t, json):
         """Функция добавления новой записи в таблицe БД"""
-        return db.table(name_t).insert(json).run()
+        try:
+            return db.table(name_t).insert(json).run()
+        except ReqlOpFailedError:
+            t = { name_t: 'the table does not exist' }
+            return t
 
     def countid(self, name_t, id_name, req):
         """Функция определения записи в таблице БД по определнному ID
@@ -76,7 +80,13 @@ class UseDatabase:
         
     def gettasks(self, name_t):
         """Получение всех записей из таблицы базы данных"""
-        return list(db.table(name_t).run())
+        try:
+            return list(db.table(name_t).run())[0]
+        except (ReqlOpFailedError, IndexError):
+            t = None #t = { name_t: 'the table does not exist' }
+        #except :
+        #    t = None
+        return t
 
     def gettask(self, name_t, req):
         """Получение записей из таблицы базы данных по определенному ID"""

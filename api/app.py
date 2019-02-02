@@ -115,19 +115,62 @@ def settab():
         t = { 'set table': 'not allowed' }
     return jsonify({'info': t})
     
+
+@app.route('/api/admin', methods=['GET','POST','DELETE'])
+@auth.login_required
+def setadmin():
+    """Служебный метод"""
+    """Запрос, создание и изменение root пользователя и пароля"""
+    conf = app.config['DB_CONFIG']
+    use_db = app.config['DB_NAME']
+    tab = app.config['DB_TAB']['tab_3']
+    if app.config['GET_USER'] == 'root':
+        if request.method == 'GET':
+            with UseDatabase(conf, use_db) as db:
+                n = db.gettasks(tab)
+        elif request.method == 'POST':
+            new_json = {}
+            if not request.json:
+                err = { 'request': 'not json format' }
+                return jsonify({'error': err})
+            elif not 'login' in request.json or not request.json['login']:
+                err = { 'request': 'login field is empty' }
+                return jsonify({'error': err})
+            elif not 'passw' in request.json or not request.json['passw']:
+                err = { 'request': 'password field is empty' }
+                return jsonify({'error': err})
+            new_json['id'] = str(request.json['login'].lower())
+            new_json['login'] = new_json['id']
+            new_json['passw'] = setpasswd(new_json['login'], request.json['passw'])
+            with UseDatabase(conf, use_db) as db:
+                try:
+                    n = db.gettasks(tab)['login']
+                except (KeyError, TypeError):
+                    n = None
+                if not n:
+                    n = db.insert(tab, new_json)
+                #elif n:
+                    
+        else:
+            n = { 'error method': 'method is not supported' }
+    return jsonify({'info': n})
+        
     
-@app.route('/api/all', methods=['GET'])
+    
+@app.route('/api/all', methods=['GET','POST','DELETE'])
 @auth.login_required
 def all_users():
     """Служебный метод"""
     """Запрос содержания всех таблиц DB"""
-    if app.config['GET_USER'] == 'root':
+    if request.method == 'GET' and app.config['GET_USER'] == 'root':
         conf = app.config['DB_CONFIG']
         use_db = app.config['DB_NAME']
         tab = app.config['DB_TAB']['tab_1']
         with UseDatabase(conf, use_db) as db:
             n = db.gettasks(tab)
-        return jsonify({'info': n})
+    else:
+        n = { 'error method': 'method is not supported' }
+    return jsonify({'info': n})
 
 
 @app.route('/api/new', methods=['GET','POST'])
