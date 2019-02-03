@@ -50,18 +50,11 @@ def verify_password(username, password):
                     app.config['USER_PERMISSION'] = username.lower()
                     return db.gettask(tab, str(username.lower()))['passw']
     return None
-    
-
-
-@app.errorhandler(400)
-def bad_request(error):
-    """Ответ при неправильном запросе"""
-    return make_response(jsonify({'error': 'BadRequest'}), 400)
 
 
 @app.errorhandler(404)
 def not_found(error):
-    """Ответ при отсутствии данных в базе"""
+    """Ответ при отсутствии данных"""
     return make_response(jsonify({'error': 'NotFound'}), 404)
 
 
@@ -185,7 +178,6 @@ def setadmin():
     return jsonify({'info': n})
         
     
-    
 @app.route('/api/all', methods=['GET','POST','DELETE'])
 @auth.login_required
 def all_users():
@@ -255,14 +247,46 @@ def new_user():
 @app.route('/api/user/<task_id>', methods=['GET', 'POST', 'DELETE'])
 @auth.login_required
 def get_user(task_id):
+    """Метод доступный для конкретного пользователя по login и passw или для пользователя root"""
+    """Запрос данных о пользователе, редактирование данных и удаление"""
     if app.config['USER_PERMISSION'] == str(task_id).lower() or app.config['USER_PERMISSION'] == True:
-        """Запрос содержания таблици по определенному ID (login), обновление и ее удаление из DB"""
         conf = app.config['DB_CONFIG']
         use_db = app.config['DB_NAME']
         tab = app.config['DB_TAB']['tab_1']
-        if request.method == 'GET':
+        if request.method == 'GET': #Запрос данных о пользователе
             with UseDatabase(conf, use_db) as db:
                 n = db.gettask(tab, str(task_id))
+        elif request.method == 'POST': #Редактирование данных пользователя
+            new_json = {}
+            with UseDatabase(conf, use_db) as db:
+                try:
+                    data = db.gettask(tab, str(task_id))
+                except (KeyError, TypeError):
+                    data = None
+                if data:
+                    new_json['passw'] = setpasswd(data['login'], request.json['passw']) if 'passw' in request.json else data['passw']
+                    new_json['phone'] = request.json['phone'] if 'phone' in request.json else data['phone']
+                    new_json['email'] = request.json['email'] if 'email' in request.json else data['email']
+                    new_json['reg_date'] = data['reg_date']
+                    new_json['ch_date'] = datetime.now().strftime("%Y-%m-%d %X")
+                    new_json['name'] = request.json['name'] if 'name' in request.json else data['name']
+                    new_json['gender'] = request.json['gender'] if 'gender' in request.json else data['gender']
+                    n = db.updetask(tab, data['login'], new_json)
+                else:
+                    n = { 'error': 'the record does not exist' }
+        elif request.method == 'DELETE': #Удаление данных о пользователе
+            with UseDatabase(conf, use_db) as db:
+                try:
+                    n = db.gettask(tab, str(task_id))['login']
+                except (KeyError, TypeError):
+                    n = None
+                id_name = n
+                if n:
+                    n = db.delltask(tab, id_name)
+                else:
+                    n = { 'error': 'the record does not exist' }
+        else:
+            n = { 'error method': 'method is not supported' }
     else:
         n =  { 'for user ' + app.config['USER_PERMISSION']: 'the request ' + str(task_id).lower() + ' is not allowed' }
     return jsonify({'info': n})

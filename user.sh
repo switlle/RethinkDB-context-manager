@@ -4,7 +4,7 @@ url="api/new"
 #user="api"
 #passwd="1245"
 # Формируем JSON
-login="rocha"
+login="demo"
 name="Busan"
 passw="root"
 phone="79005006826"
