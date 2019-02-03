@@ -79,8 +79,8 @@ def setdb():
     else:
         d = { 'set database': 'not allowed' }
     return jsonify({'info': d})
-    
-    
+
+
 @app.route('/api/tab', methods=['GET','POST','DELETE'])
 @auth.login_required
 def settab():
@@ -117,7 +117,7 @@ def settab():
     else:
         t = { 'set table': 'not allowed' }
     return jsonify({'info': t})
-    
+
 
 @app.route('/api/admin', methods=['GET','POST','DELETE'])
 @auth.login_required
@@ -176,8 +176,8 @@ def setadmin():
         else:
             n = { 'error method': 'method is not supported' }
     return jsonify({'info': n})
-        
-    
+
+
 @app.route('/api/all', methods=['GET','POST','DELETE'])
 @auth.login_required
 def all_users():
@@ -289,6 +289,47 @@ def get_user(task_id):
             n = { 'error method': 'method is not supported' }
     else:
         n =  { 'for user ' + app.config['USER_PERMISSION']: 'the request ' + str(task_id).lower() + ' is not allowed' }
+    return jsonify({'info': n})
+
+
+@app.route('/api/passw/<task_id>', methods=['GET', 'POST', 'DELETE'])
+def passw_user(task_id):
+    """Метод доступный для любого пользователя для восстановления пароля к учетной записи"""
+    """Редактирование пароля по 3 параметрам: login, email, phone"""
+    conf = app.config['DB_CONFIG']
+    use_db = app.config['DB_NAME']
+    tab = app.config['DB_TAB']['tab_1']
+    if request.method == 'POST':
+        if not request.json:
+            err = { 'request': 'not json format' }
+            return jsonify({'error': err})
+        elif not 'passw' in request.json or not request.json['passw']:
+            err = { 'request': 'password field is empty' }
+            return jsonify({'error': err})
+        elif not 'phone' in request.json or not request.json['phone']:
+            err = { 'request': 'phone number field is empty' }
+            return jsonify({'error': err})
+        elif not 'email' in request.json or not request.json['email']:
+            err = { 'request': 'email field is empty' }
+            return jsonify({'error': err})
+        else:
+            new_json = {}
+            with UseDatabase(conf, use_db) as db:
+                try:
+                    data = db.gettask(tab, str(task_id))
+                except (KeyError, TypeError):
+                    data = None
+                if data and data['phone'] == request.json['phone'] and \
+                data['email'] == request.json['email']:
+                    new_json['passw'] = setpasswd(str(task_id), request.json['passw'])
+                    new_json['phone'] = request.json['phone']
+                    new_json['email'] = request.json['email']
+                    new_json['ch_date'] = datetime.now().strftime("%Y-%m-%d %X")
+                    n = db.updetask(tab, str(task_id), new_json)
+                else:
+                    n = { 'error': 'no such user or email and phone data does not match' }
+    else:
+        n = { 'error method': 'method is not supported' }
     return jsonify({'info': n})
 
 
