@@ -19,26 +19,36 @@ def setpasswd(login:str, passw:str) -> str:
 @auth.verify_password
 def verify_password(username, password):
     """Проверка пароля и логина"""
-    root = app.config['ROOT_USER']
     conf = app.config['DB_CONFIG']
     use_db = app.config['DB_NAME']
     tab = app.config['DB_TAB']['tab_1']
+    tab_root = app.config['DB_TAB']['tab_3']
     with UseDatabase(conf, use_db) as db:
-        if username.lower() in root.keys():
-            if root[str(username.lower())] == setpasswd(username.lower(), password):
-            #При совпедении passwd, возвращаем хеш passwd root
-                app.config['GET_USER'] = str(username.lower())
-                return root[str(username.lower())]
+        try:
+            root = db.getroot(tab_root)['login']
+            root_passw = db.getroot(tab_root)['passw']
+        except TypeError:
+            root, root_passw = None, None
+        rt = root
+        if not rt:
+            root = app.config['ROOT_USER']['login']
+            root_passw = app.config['ROOT_USER']['passw']
+        if username.lower() == root:
+            if root_passw == setpasswd(username.lower(), password):
+                app.config['USER_PERMISSION'] = True
+                #При совпедении passwd, возвращаем хеш passwd root
+                passw = db.getroot(tab_root)['passw'] if rt else root_passw
+                return passw
         else:
             try:
-                l = db.gettask(tab, str(username.lower()))['login']
+                usr = db.gettask(tab, str(username.lower()))['login']
+                passw = db.gettask(tab, str(username.lower()))['passw']
             except TypeError:
-                l = None
-            if l == username.lower():
-                if db.gettask(tab, str(username.lower()))['passw'] == setpasswd(username.lower(), password):
-                    app.config['GET_USER'] = str(username.lower())
+                usr = None
+            if usr == username.lower():
+                if passw == setpasswd(username.lower(), password):
+                    app.config['USER_PERMISSION'] = username.lower()
                     return db.gettask(tab, str(username.lower()))['passw']
-    
     return None
     
 
@@ -60,7 +70,7 @@ def not_found(error):
 def setdb():
     """Служебный метод"""
     """Запрос баз данных, создание и удаление"""
-    if app.config['GET_USER'] == 'root':
+    if app.config['USER_PERMISSION'] == True:
         conf = app.config['DB_CONFIG']
         use_db = str(app.config['DB_NAME'])
         with UseDatabase(conf) as db:
@@ -83,7 +93,7 @@ def setdb():
 def settab():
     """Служебный метод"""
     """Запрос таблиц, создание и удаление"""
-    if app.config['GET_USER'] == 'root':
+    if app.config['USER_PERMISSION'] == True:
         conf = app.config['DB_CONFIG']
         use_db = app.config['DB_NAME']
         name = list(app.config['DB_TAB'].values())
@@ -120,14 +130,21 @@ def settab():
 @auth.login_required
 def setadmin():
     """Служебный метод"""
-    """Запрос, создание и изменение root пользователя и пароля"""
+    """Запрос и изменение root пароля, создание нового root пользователя и его удаление"""
+    """После создания имени пользователя, его изменить нельзя, 
+        только если удалить и создать нового root пользователя с новым именем"""
     conf = app.config['DB_CONFIG']
     use_db = app.config['DB_NAME']
     tab = app.config['DB_TAB']['tab_3']
-    if app.config['GET_USER'] == 'root':
+    if app.config['USER_PERMISSION'] == True:
         if request.method == 'GET':
             with UseDatabase(conf, use_db) as db:
-                n = db.gettasks(tab)
+                try:
+                    n = db.getroot(tab)
+                except (KeyError, TypeError):
+                    n = { 'error': 'the record does not exist' }
+                if not n:
+                    n = { 'error': 'the record does not exist' }
         elif request.method == 'POST':
             new_json = {}
             if not request.json:
@@ -144,13 +161,25 @@ def setadmin():
             new_json['passw'] = setpasswd(new_json['login'], request.json['passw'])
             with UseDatabase(conf, use_db) as db:
                 try:
-                    n = db.gettasks(tab)['login']
+                    n = db.getroot(tab)['login']
+                    id_name = n
                 except (KeyError, TypeError):
                     n = None
                 if not n:
                     n = db.insert(tab, new_json)
-                #elif n:
-                    
+                elif n:
+                    n = db.updetask(tab, id_name, new_json)
+        elif request.method == 'DELETE':
+            with UseDatabase(conf, use_db) as db:
+                try:
+                    n = db.getroot(tab)['login']
+                    id_name = n
+                except (KeyError, TypeError):
+                    n = None
+                if n:
+                    n = db.delltask(tab, id_name)
+                else:
+                    n = { 'error': 'the record does not exist' }
         else:
             n = { 'error method': 'method is not supported' }
     return jsonify({'info': n})
@@ -162,14 +191,16 @@ def setadmin():
 def all_users():
     """Служебный метод"""
     """Запрос содержания всех таблиц DB"""
-    if request.method == 'GET' and app.config['GET_USER'] == 'root':
-        conf = app.config['DB_CONFIG']
-        use_db = app.config['DB_NAME']
-        tab = app.config['DB_TAB']['tab_1']
-        with UseDatabase(conf, use_db) as db:
-            n = db.gettasks(tab)
-    else:
-        n = { 'error method': 'method is not supported' }
+    if app.config['USER_PERMISSION'] == True:
+        if request.method == 'GET':
+            conf = app.config['DB_CONFIG']
+            use_db = app.config['DB_NAME']
+            tab = app.config['DB_TAB']['tab_1']
+            with UseDatabase(conf, use_db) as db:
+                n = db.gettasks(tab)
+        else:
+            n = { 'error method': 'method is not supported' }
+    else: n = { 'for user ' + app.config['USER_PERMISSION']: 'this request is not allowed' }
     return jsonify({'info': n})
 
 
@@ -177,7 +208,7 @@ def all_users():
 def new_user():
     """Метод доступный для всех"""
     """Создание нового пользователя"""
-#curl -s -H "Content-Type: application/json" -X POST -d '{"name": {"user": "mail@mail.ru"}}' http://uwsgi.loc:5000/api/new
+#curl -s -H "Content-Type: application/json" -X POST -d '{"user": "mail@mail.ru"}' http://uwsgi.loc:5000/api/new
     content = app.config['DB_CONT']
     conf = app.config['DB_CONFIG']
     use_db = app.config['DB_NAME']
@@ -218,20 +249,23 @@ def new_user():
                     n = db.insert(tab, new_json)
                 else:
                     n = { 'user ' + new_json['login']: 'already exist' }
-                return jsonify({'info': n})
+            return jsonify({'info': n})
 
 
-@app.route('/api/<task_id>', methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/user/<task_id>', methods=['GET', 'POST', 'DELETE'])
 @auth.login_required
 def get_user(task_id):
-    """Запрос содержания таблици по определенному ID (login), обновление и ее удаление из DB"""
-    conf = app.config['DB_CONFIG']
-    use_db = app.config['DB_NAME']
-    tab = app.config['DB_TAB']['tab_1']
-    if request.method == 'GET':
-        with UseDatabase(conf, use_db) as db:
-            n = db.gettask(tab, str(task_id))
-        return jsonify({'info': n})
+    if app.config['USER_PERMISSION'] == str(task_id).lower() or app.config['USER_PERMISSION'] == True:
+        """Запрос содержания таблици по определенному ID (login), обновление и ее удаление из DB"""
+        conf = app.config['DB_CONFIG']
+        use_db = app.config['DB_NAME']
+        tab = app.config['DB_TAB']['tab_1']
+        if request.method == 'GET':
+            with UseDatabase(conf, use_db) as db:
+                n = db.gettask(tab, str(task_id))
+    else:
+        n =  { 'for user ' + app.config['USER_PERMISSION']: 'the request ' + str(task_id).lower() + ' is not allowed' }
+    return jsonify({'info': n})
 
 
 if __name__ == '__main__':

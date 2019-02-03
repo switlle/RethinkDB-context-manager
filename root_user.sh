@@ -4,8 +4,8 @@ url="api/admin"
 user="root"
 passwd="root"
 # Формируем JSON
-login="root"
-passw="root"
+login="admin"
+passw="admin"
 
 INFO=$(\
 printf "{\n"
