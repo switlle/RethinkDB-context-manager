@@ -57,7 +57,7 @@ class UseDatabase:
             return { name_t + ' in DB ' + name_db: 'the table does not exist' }
 
     def insert(self, name_t, json):
-        """Добавление новой записи в таблицe БД"""
+        """Добавление новой записи в таблицу БД"""
         try:
             return db.table(name_t).insert(json).run()
         except ReqlOpFailedError:
@@ -92,16 +92,16 @@ class UseDatabase:
         return db.table(name_t).get(id_name).update(json).run()
 
     def delltask(self, name_t, id_name):
-        """Функция удаления записи в таблице БД по определнному ID"""
+        """Удаление записи в таблице БД по определнному ID"""
         return db.table(name_t).get(id_name).delete().run()
 
-    def getval(self, id, table):
-        """Получение значений, без ключей из таблицы базы данных по определенному ID"""
-        return list(db.table(table).get(id).values().run())
+    def getval(self, name_t, id_name):
+        """Получение значений, без ключей из таблицы БД по определенному ID"""
+        return list(db.table(name_t).get(id_name).values().run())
 
-    def countall(self, table):
-        """Функция определения количества записи в таблице БД"""
-        return db.table(table).count().run()
+    def countall(self, name_t):
+        """Определение количества записи в таблице БД"""
+        return db.table(name_t).count().run()
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Отключение от БД"""
