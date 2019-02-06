@@ -86,7 +86,10 @@ class UseDatabase:
 
     def gettask(self, name_t, req):
         """Получение записей из таблицы базы данных по определенному ID"""
-        return db.table(name_t).get(req).run()
+        try:
+            return db.table(name_t).get(req).run()
+        except ReqlOpFailedError:
+            return None
 
     def updetask(self, name_t, id_name, json):
         """Обновление записи в таблице БД по определнному ID"""
