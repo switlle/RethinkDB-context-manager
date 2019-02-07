@@ -36,7 +36,7 @@ class UseDatabase:
     def all_table(self, name_db):
         """Получение всех таблиц из подключенной БД"""
         try:
-            t = db.table_list().run(self.conn)
+            t = db.db(name_db).table_list().run(self.conn)
             if not t:  # Если таблиц нет
                 t = {'table in DB ' + name_db: 'not found'}
             return t
